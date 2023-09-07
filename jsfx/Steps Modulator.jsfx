@@ -1,0 +1,605 @@
+// Update 9.04.23
+
+desc: Steps Modulator
+
+slider1:0<0,100,1>-Modulator 
+slider2:0<0,100,1>Value 
+slider3:100<-200,200,1>Amount 
+slider13:0<-100,100,1>-Mod Bi
+
+slider4:2<0,2,1{Off,Ping Pong,On}>-Reverse
+slider5:0<0,1,1>-Bipolar
+slider6:16<2,64,1>Steps 
+slider7:0<0,100,1>Phase 
+
+slider8:2<0,6,1{Bar,1/2,1/4,1/8,1/16,1/32}>Timebase 
+slider9:1<0.02,10,0.01>Rate 
+slider11:0<0,500,1>Smooth 
+slider12:0<-100,100,1>-Out
+
+slider20:0<0,1,1>-Randomize
+
+in_pin:none
+out_pin:none
+
+@init
+
+ amount = 100;
+ ext_noinit = 1;
+ lastCap = 1;
+ 
+ function rad(d)
+               ( d * $pi / 180 );
+               
+ function limitgui(s knob_min knob_max)
+             ( min(max(s, knob_min), knob_max) );
+               
+ function collision (_x _y _w _h)
+                     (
+                     mouse_x > _x && 
+                     mouse_x < _x + _w && 
+                     mouse_y > _y && 
+                     mouse_y < _y + _h
+                     );
+                     
+ function move(_x _y _w _h n) ( 
+        mouse_cap && collision (_x,_y,_w,_h) ? ( mouse_cap_old = 0) : ( mouse_cap_old = 1);
+        mouse_cap == 1 && mouse_cap_old == 0 && collision (_x,_y,_w,_h) ? (           //  mouse control
+   // knob_min = 2;
+   // knob_max = 64;
+         
+         drag == 0 ? (old_mouse_x = mouse_x; drag = 1; val_old = val);
+         drag == 1 ? (
+                      new_pos = slider(n) - (old_mouse_x - mouse_x)*0.5;
+                      old_mouse_x = mouse_x;
+                      slider(n) = limitgui(new_pos,2,64);
+                      slider_automate(slider(n));
+                     );
+               );
+                mouse_cap == 0 ? drag = 0;
+ );
+
+ 
+@slider
+
+val = slider2;
+rev = slider4;
+bi = slider5;
+step = slider6;
+note = slider8;
+phase = slider7;
+amount = slider3;
+rnd = slider20;
+coeff = exp(-1/(slider11/1000*srate));
+mod_bi = slider13;
+
+@serialize
+
+file_var(0,VarAll);
+file_var(0,autorand);
+file_mem(0,1,64);
+   
+@block
+
+(play_state&0) ?  beatpos = -100;
+rate = 1/(2^note)*4*slider9;
+beatpos = (play_state&1) ? ((beat_position/rate)%step) + 1 : -100;
+newbeat = (beat_position*0.25)* step + beatpos ;
+
+slider20 == 1 ? (
+  s = 1 ;
+  loop(64,
+      bi == 0 ? (CtVar[s] = ceil(rand(100))) : (CtVar[s] = ceil(rand(200)-100));
+      s += 1 ;
+      );
+slider20 = 0;
+);
+
+beatpos = beatpos + ceil(step/100 * phase);
+beatpos > step ? beatpos = beatpos - step;
+
+rev == 0 ? slider13 = CtVar[step - beatpos + 1] / 100 * amount;    //rev on
+rev == 2 ? slider13 = CtVar[beatpos] / 100 * amount;               //rev off
+
+slider1 = val + slider12;
+slider1 < 0 ? slider1 = 0;
+slider1 > 100 ? slider1 = 100;
+
+@sample
+
+  mover = slider13;
+  out = out * coeff + mover * (1 - coeff);
+slider12 = out;
+
+
+@gfx 530 205
+
+  gfx_set(0.18,0.18,0.18,1);
+  gfx_rect(0,0,gfx_w,gfx_h);
+  
+  gfx_set(0.11,0.11,0.11,1);
+  gfx_rect(5,5,gfx_w-10,170);
+  
+  gfx_set(0.3,0.3,0.3,1);
+  gfx_line(9,9,gfx_w-10,9);
+  
+  gfx_set(0.3,0.3,0.3,1);
+  gfx_line(9,141,gfx_w-10,141);
+  
+  gfx_set(0.3,0.3,0.3,1);
+  gfx_line(9,75,gfx_w-10,75);
+  
+  
+         // Mouse Click
+  mouseHold = mouse_cap & 1;
+       mouseClick = mouseHold && !(last_cap&1);
+       lastCap = mouse_cap;
+  
+// ------------------------------------------step sliders
+
+bi == 0 ? (
+  
+looper = 0 ;
+
+     loop(step,
+     _x = 10 +(_w + sx) * looper; 
+     _y = 10;
+     sx = 1;
+     _h = 130;
+     _w = floor((gfx_w - (step-1)*sx -18) /step);
+
+(mouse_cap&1) ? (
+      (mouse_x >= _x ) & (mouse_x < _x + _w) ? (
+      (mouse_y >= _y - 4) & (mouse_y < _y + _h + 4) ? (
+      CtVar[looper+1]  = floor(( _h -(mouse_y-_y)) * (100/_h)) ;
+      CtVar[looper+1] < 0 ? CtVar[looper+1]  = 0;
+      CtVar[looper+1]  > 100 ? CtVar[looper+1]  = 100;
+      );
+    );
+   ):(
+    foo = 1;
+);
+
+gfx_set(0,0.5,1,1);                                 //steps backgrnd color
+gfx_x = _x; gfx_y = _y;   
+gfx_rect(_x,_y,_w,_h);
+
+gfx_x = _x; gfx_y = _y;
+rev == 0 ? beatpos == step - looper ? (gfx_set(0.9,0.9,0.9,0.9));       //reverse
+
+rev == 2 ? beatpos == looper + 1  ? (gfx_set(0.9,0.9,0.9,0.9));        // normal
+gfx_rect(_x,_y,_w,_h) ; 
+
+gfx_set(0.11,0.11,0.11,1);                                  //step sliders color
+gfx_x = _x ; gfx_y = _h + 10 - (CtVar[looper+1] /(100/_h));
+gfx_rect(_x,_y,_w,(gfx_y-10)) ;  
+
+    looper += 1;
+) ;
+
+num_steps = ceil((mouse_x - 11) / (_w + sx));
+
+      gfx_set(1,1,1,1);
+      gfx_x = 22; gfx_y = 182;
+      gfx_setfont(1,"Arial bold",15);
+      gfx_drawnumber(CtVar[num_steps],0);
+ );
+
+// ------------------------------------------step sliders bipolar
+
+bi == 1 ? (
+  
+looper = 0 ;
+
+     loop(step,
+     _x = 10 +(_w + sx) * looper; 
+     _y = 10;
+     sx = 1;
+     _h = 130;
+     _w = floor((gfx_w - (step-1)*sx -18) /step);
+     
+//  ---------------------------Top
+
+(mouse_cap&1) ? (
+      (mouse_x >= _x ) & (mouse_x < _x + _w) ? (
+      (mouse_y >= _y - 4) & (mouse_y < _y + _h/2) ? (
+      CtVar[looper+1]  = floor(( _h/2 - (mouse_y-_y)) * (200/_h)) ;
+      CtVar[looper+1] < 0 ? CtVar[looper+1]  = 0;
+      CtVar[looper+1]  > 100 ? CtVar[looper+1]  = 100;
+      );
+    );
+   ):(
+    foo = 1;
+);
+
+gfx_set(0,0.5,1,1);                                 //steps backgrnd color
+gfx_x = _x; gfx_y = _y;   
+gfx_rect(_x,_y,_w,_h/2);
+
+gfx_x = _x; gfx_y = _y;
+rev == 0 ? beatpos == step - looper ? (gfx_set(0.9,0.9,0.9,0.9));       //reverse
+//rev == 1 ?        // ping pong
+rev == 2 ? beatpos == looper + 1  ? (gfx_set(0.9,0.9,0.9,0.9));   // normal
+gfx_rect(_x,_y,_w,_h/2) ; 
+
+gfx_set(0.11,0.11,0.11,1);                                  //step sliders color
+gfx_x = _x ; gfx_y = _h/2 + 10 - (CtVar[looper+1] /(100/_h));
+gfx_rect(_x,_y,_w,(gfx_y-10+_h/2)/2); 
+
+//  ---------------------------Zero
+
+(mouse_cap&8) ? (
+      (mouse_x >= _x ) & (mouse_x < _x + _w) ? (
+      (mouse_y >= _y ) & (mouse_y < _y + _h) ? (
+      CtVar[looper+1]  = 0 ;
+      );
+    );
+   ):(
+    foo = 1;
+);
+     
+//  ---------------------------Bottom
+
+(mouse_cap&1) ? (
+      (mouse_x >= _x ) & (mouse_x < _x + _w) ? (
+      (mouse_y >= _y + _h/2 ) & (mouse_y < _y + _h + 4) ? (
+      CtVar[looper+1]  = floor(( _h/2  -(mouse_y-_y)) * (200/_h)) ;
+      CtVar[looper+1] < -100 ? CtVar[looper+1]  = -100;
+      CtVar[looper+1]  > 0 ? CtVar[looper+1]  = 0;
+      );
+    );
+   ):(
+    foo = 1;
+);
+
+gfx_set(0.11,0.11,0.11,1);                //steps backgrnd color 
+gfx_x = _x; gfx_y = _y;   
+gfx_rect(_x,_y +_h/2,_w,_h/2);
+
+gfx_set(0,0.5,1,1);                                  //step sliders color
+gfx_x = _x ; gfx_y = _h + 10 - (CtVar[looper+1] /(100/_h));
+gfx_rect(_x,_y + _h/2,_w,(gfx_y - 10 -_h)/2) ;  
+
+gfx_x = _x; gfx_y = _h + 10 - (CtVar[looper+1] /(100/_h));
+rev == 0 ? beatpos == step - looper ? (gfx_set(0.9,0.9,0.9,0.9));       //reverse
+//rev == 1 ?        // ping pong
+rev == 2 ? beatpos == looper + 1  ? (gfx_set(0.9,0.9,0.9,0.9));   // normal
+gfx_rect(_x,_y +_h/2,_w,(gfx_y - 10 -_h)/2); 
+
+//  -------------------------------------
+
+    looper += 1;
+   );
+ );
+
+  gfx_set(0.18,0.18,0.18,1);
+  gfx_rect(0,171,gfx_w,gfx_h );
+  
+  gfx_set(0.12,0.12,0.12,1);
+  gfx_rect(5,177,254,23 );
+      
+      (mouse_x >= 9 ) & (mouse_x < 520) &
+      (mouse_y >= 9) & (mouse_y < 141) ? (
+        num_steps = ceil((mouse_x - 11) / (_w + sx));
+       
+      gfx_set(0.9,0.9,0.9,1);
+      gfx_x = 20; gfx_y = 181;
+      gfx_setfont(1,"Arial bold",15);
+      gfx_drawstr("STEP");
+      
+      gfx_x = 55; gfx_y = 181;
+      gfx_setfont(1,"Arial bold",15);
+      gfx_drawnumber(num_steps,0);
+      
+      gfx_set(0.5,0.5,0.5,1);
+      gfx_x = 75; gfx_y = 181;
+      gfx_setfont(1,"Arial bold",15);
+      gfx_drawstr(sprintf(#,"%.0f %%",CtVar[num_steps]));
+      
+      gfx_set(0.9,0.9,0.9,1);
+      gfx_x = 160; gfx_y = 181;
+      gfx_setfont(1,"Arial bold",15);
+      gfx_drawstr("SHIFT");
+      
+      gfx_set(0.5,0.5,0.5,1);
+      gfx_x = 200; gfx_y = 181;
+      gfx_setfont(1,"Arial bold",15);
+      gfx_drawstr("0");
+      
+  );
+
+// -------------------------------------------Bipolar
+
+_x = 15;
+_y = 146;
+_w = 20; 
+_h = 20;
+
+           
+
+      collision (_x,_y,_w,_h) ? (
+      
+      gfx_set(0.9,0.9,0.9,1);
+      gfx_x = 20; gfx_y = 181;
+      gfx_setfont(1,"Arial bold",15);
+      gfx_drawstr("BIPOLAR");
+
+     gfx_set(0.5,0.5,0.5,1);
+     gfx_x = 75; gfx_y = 181;
+     gfx_setfont(1,"Arial bold",15);
+     bi == 0 ? gfx_drawstr(" Off");
+     bi == 1 ? gfx_drawstr(" On");
+   );
+
+                   mouseClick ? (
+      collision (_x,_y,_w,_h) ? (
+        bi == 0 ? (
+          bi = 1;
+          slider3 = 50;
+          amount = slider3;
+         ):(
+          bi = 0;
+          slider3 = 100;
+          amount = slider3;
+        );
+      );
+);
+last_cap = mouse_cap;     
+  
+     slider5 = bi;
+     
+     bi == 0 ? (gfx_set(0.3,0.3,0.3,1)) : (gfx_set(0.87,0.53,0.11,1));
+     gfx_x =_x + 7; gfx_y = _y - 5;
+     gfx_setfont(1,"Arial bold",17);
+     gfx_drawstr("-");
+     
+     bi == 1 ?  (gfx_set(0.87,0.53,0.11,1)) : (gfx_set(0.3,0.3,0.3,1));
+     gfx_x =_x + 5; gfx_y = _y + 5;
+     gfx_setfont(1,"Arial bold",17);
+     gfx_drawstr("+");
+
+// -------------------------------------------Steps slider
+
+
+_x = 49;
+_y = 146;
+_w = 125; 
+_h = 20;
+
+//step = limitgui(new_pos,2,64);
+//move(_x,_y,_w,_h,6);
+
+// ---------slider background
+
+   /*   gfx_set(.13,.13,.13,1);
+      k = 1;
+      loop(19,
+      gfx_line(_x+k,_y+_h,_x+_w-1,_y+k, 1);
+      k +=1;
+    );
+
+  gfx_set(.2,.2,.2,1);
+  gfx_roundrect(_x,_y,_w,_h,4,1);*/
+
+// ---------Steps slider
+
+gfx_set(1,1,0,1);
+gfx_x = _x + 39; gfx_y = _y + 2;
+gfx_setfont(1,"Arial bold",15);
+gfx_drawnumber( step,0);
+
+gfx_set(1,1,0,1);
+gfx_x = _x + 59; gfx_y = _y + 2;
+gfx_setfont(1,"Arial bold",15);
+gfx_drawstr("steps");
+
+      collision (_x,_y,_w,_h) ? (
+      
+      gfx_set(0.9,0.9,0.9,1);
+      gfx_x = 20; gfx_y = 181;
+      gfx_setfont(1,"Arial bold",15);
+      gfx_drawstr("STEP COUNT");
+      
+      gfx_set(0.5,0.5,0.5,1);
+      gfx_x = 110; gfx_y = 181;
+      gfx_setfont(1,"Arial bold",15);
+      gfx_drawnumber(step,0);
+      
+      gfx_set(0.5,0.5,0.5,1);
+      gfx_x = 125; gfx_y = 181;
+      gfx_setfont(1,"Arial bold",15);
+      gfx_drawstr(" step");
+   );
+   
+// -------------------------------------------Reverse slider
+
+_x = 190;
+_y = 148;
+_w = 60; 
+_h = 20;
+
+mouseClick & (mouse_y >= _y) & (mouse_y < _y + _h) ? ( 
+                (mouse_x >= _x) & (mouse_x < _x + _w/2) ? rev = 0;
+                //(mouse_x >= _x + _w/3) & (mouse_x < _x + 2*_w/3) ? rev = 1;
+                (mouse_x >= _x + _w/2) & (mouse_x < _x + _w) ? rev = 2;
+                
+                slider4 = rev;
+            );
+
+rev == 0 ? gfx_set(1,0,1,1) : gfx_set(0.5,0.5,0.5,1);
+gfx_x = _x + 4; gfx_y = _y  ;
+gfx_setfont(1,"Arial bold",17);
+gfx_drawstr("<");
+
+rev == 1 ? gfx_set(0.87,0.53,0.11,1) : gfx_set(0.5,0.5,0.5,1);
+gfx_x = _x + 24; gfx_y = _y + 2;
+gfx_setfont(1,"Arial bold",15);
+//gfx_drawstr("<>");
+
+rev == 2 ? gfx_set(1,0,1,1) : gfx_set(0.5,0.5,0.5,1);
+gfx_x = _x + 50; gfx_y = _y ;
+gfx_setfont(1,"Arial bold",17);
+gfx_drawstr(">");
+
+      collision (_x,_y,_w,_h) ? (
+      
+      gfx_set(0.9,0.9,0.9,1);
+      gfx_x = 20; gfx_y = 181;
+      gfx_setfont(1,"Arial bold",15);
+      gfx_drawstr("REVERSE");
+      
+      gfx_set(0.5,0.5,0.5,1);
+      gfx_x = 85; gfx_y = 181;
+      gfx_setfont(1,"Arial bold",15);
+      rev == 0 ? gfx_drawstr(" on");
+      //rev == 1 ? gfx_drawstr(" ping pong");
+      rev == 2 ? gfx_drawstr(" off");
+   );
+    
+// -------------------------------------------------------Clear button
+
+looper = 0 ;
+
+_x = 395 + (_w + sx) * looper;
+_y = 146;         
+_w = 60;
+_h = 20;
+sx = 2;
+
+resetall = 0;
+                mouseClick ? (
+    collision(_x,_y,_w,_h) ? (
+    resetall = 1;
+  s = 1 ;
+loop(64,
+CtVar[s] = 0;
+      s += 1 ;
+      );
+    );
+  );
+
+resetall == 1 ? (
+    gfx_set(0.87,0.53,0.11,0.8);
+    gfx_x=_x; gfx_y=_y;
+    gfx_rectto(gfx_x + _w,_y + _h);   //pushed
+   ) : (
+    foo = 1;
+    gfx_set(0.2,0.2,0.2,1);
+    gfx_x =_x ;gfx_y =_y ;
+    gfx_rectto(gfx_x + _w,_y + _h) ;     //unpushed
+);
+
+    gfx_set(0.9,0.9,0.9,1);
+    gfx_setfont(1,"Arial bold",13);
+    gfx_x =_x+17 ; gfx_y = _y+3 ;
+    gfx_drawstr("Clear");
+
+// ------------------------------------------------ Randomize button
+
+looper = 0 ;
+
+_x = 460 +(_w + sx) * looper  ;
+_y = 146 ;
+_w = 60 ; 
+_h = 20;
+sx = 2 ;
+
+                 mouseClick ? (
+    collision (_x,_y,_w,_h) ? (
+      s=1 ;
+     loop(64,
+     bi == 0 ? (CtVar[s] = ceil(rand(100))) : (CtVar[s] = ceil(rand(200)-100));
+     s +=1 ;
+      );
+      slider20 = 1;
+      slider_automate(slider20);
+     );
+    );
+    
+   rnd = 0;
+
+    gfx_set(0.2,0.2,0.2,1);          
+    gfx_x=_x ;gfx_y=_y ;
+    gfx_rectto(gfx_x +_w,_y +_h);
+
+    gfx_set(0.9,0.9,0.9,1);
+    gfx_setfont(1,"Arial bold",13);
+    gfx_x=_x+18 ;gfx_y=_y+3 ;
+    gfx_drawstr("Rand");
+
+//  ----------------Modulator Knob
+
+function collision_R(_x _y _r) (
+                        mouse_x > _x-_r-5 && 
+                        mouse_x < _x+_r+5 && 
+                        mouse_y > _y-_r-5 && 
+                        mouse_y < _y+_r+5
+                        );
+            
+function Round_knob (_x _y _r n) (                                      //  Draw a knob
+
+ gfx_x = _x; gfx_y = _y;
+
+// gfx_rect(_x-_r-7,_y-_r-7,2*_r+14,2*_r+14,0);  // collision area
+ 
+gfx_set(0.3,0.3,0.3,1);                                                                     // knob
+gfx_circle(_x,_y,_r,1);
+
+start = -140 + val * 2.8;
+end = -140 + val * 2.8 + out * 2.8;
+ end < -140 ? end = -140;
+ end > 140 ? end = 140;
+
+gfx_set(0,1,1,1);                                                                            // dot
+gfx_arc(_x,_y,_r-2,rad(start),rad(start+1),1);
+
+gfx_set(0,1,1,1);                                                                           // dot+
+gfx_arc(_x,_y,_r-3,rad(start),rad(start+1),1);
+
+gfx_set(0,1,1,1);                                                                            // mod
+gfx_arc(_x,_y,_r+3,rad(start),rad(end));
+
+gfx_set(0,1,1,1);                                                                           // mod+
+gfx_arc(_x,_y,_r+4,rad(start),rad(end));                           
+  
+  
+  
+  (mouse_cap == 0 || mouse_cap == 1) && collision_R (_x,_y,_r) ? (                  // collision area
+    gfx_set(0.4,0.4,0.4,.7);
+    gfx_rect(_x-_r-7,_y-_r-7,2*_r+14,2*_r+14,0);
+  );  
+    gfx_set(1,1,1,1);
+    gfx_x = _x-_r+5; gfx_y = _y+_r+5;
+    gfx_setfont(1,"Arial bold",15);
+    gfx_drawnumber( slider(n),0);
+  
+);
+
+// -------------------------------------------------------
+_x = 294; _y = 163;
+_w = 60; _h = 56; _r = 13;
+
+    gfx_set(0.11,0.11,0.11,1);          
+    gfx_rect(_x-_r-12,_y-_r,2*_r+24,2*_r+24,1);
+
+          
+Round_knob(_x,_y,_r,1);
+
+                    mouseClick ? (         // Last touched parameter
+            collision_R (_x,_y,_r) ? (
+             slider_automate(slider1);
+           );
+        );
+
+      collision_R (_x,_y,_r) ? (
+      
+      gfx_set(0.9,0.9,0.9,1);
+      gfx_x = 20; gfx_y = 181;
+      gfx_setfont(1,"Arial bold",15);
+      gfx_drawstr("MODULATOR");
+      
+      gfx_x = 120; gfx_y = 181;
+      gfx_setfont(1,"Arial bold",15);
+      gfx_drawstr("Click for Last Touch");
+  );
+
