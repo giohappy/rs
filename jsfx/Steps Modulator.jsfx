@@ -1,21 +1,21 @@
-// Update 9.04.23
+// Update 17.09.23
 
-desc: Steps Modulator
+desc: Btw Steps Modulator
 
-slider1:0<0,100,1>-Modulator 
-slider2:0<0,100,1>Value 
-slider3:100<-200,200,1>Amount 
-slider13:0<-100,100,1>-Mod Bi
+slider51:0<0,100,1>MODULATOR   
+slider2:0<0,100,1>Value       
+slider3:100<-200,200,1>Amount    
 
 slider4:2<0,2,1{Off,Ping Pong,On}>-Reverse
 slider5:0<0,1,1>-Bipolar
-slider6:16<2,64,1>Steps 
-slider7:0<0,100,1>Phase 
+slider6:16<2,64,1>Steps       
+slider7:0<0,100,1>Phase      
 
 slider8:2<0,6,1{Bar,1/2,1/4,1/8,1/16,1/32}>Timebase 
-slider9:1<0.02,10,0.01>Rate 
-slider11:0<0,500,1>Smooth 
+slider9:1<0.02,10,0.01>Rate         
+slider11:0<0,500,1>Smooth     
 slider12:0<-100,100,1>-Out
+slider13:0<-100,100,1>-Mod Bi
 
 slider20:0<0,1,1>-Randomize
 
@@ -27,38 +27,6 @@ out_pin:none
  amount = 100;
  ext_noinit = 1;
  lastCap = 1;
- 
- function rad(d)
-               ( d * $pi / 180 );
-               
- function limitgui(s knob_min knob_max)
-             ( min(max(s, knob_min), knob_max) );
-               
- function collision (_x _y _w _h)
-                     (
-                     mouse_x > _x && 
-                     mouse_x < _x + _w && 
-                     mouse_y > _y && 
-                     mouse_y < _y + _h
-                     );
-                     
- function move(_x _y _w _h n) ( 
-        mouse_cap && collision (_x,_y,_w,_h) ? ( mouse_cap_old = 0) : ( mouse_cap_old = 1);
-        mouse_cap == 1 && mouse_cap_old == 0 && collision (_x,_y,_w,_h) ? (           //  mouse control
-   // knob_min = 2;
-   // knob_max = 64;
-         
-         drag == 0 ? (old_mouse_x = mouse_x; drag = 1; val_old = val);
-         drag == 1 ? (
-                      new_pos = slider(n) - (old_mouse_x - mouse_x)*0.5;
-                      old_mouse_x = mouse_x;
-                      slider(n) = limitgui(new_pos,2,64);
-                      slider_automate(slider(n));
-                     );
-               );
-                mouse_cap == 0 ? drag = 0;
- );
-
  
 @slider
 
@@ -73,11 +41,6 @@ rnd = slider20;
 coeff = exp(-1/(slider11/1000*srate));
 mod_bi = slider13;
 
-@serialize
-
-file_var(0,VarAll);
-file_var(0,autorand);
-file_mem(0,1,64);
    
 @block
 
@@ -86,7 +49,7 @@ rate = 1/(2^note)*4*slider9;
 beatpos = (play_state&1) ? ((beat_position/rate)%step) + 1 : -100;
 newbeat = (beat_position*0.25)* step + beatpos ;
 
-slider20 == 1 ? (
+slider20 == 1 ? (                               // Randomize
   s = 1 ;
   loop(64,
       bi == 0 ? (CtVar[s] = ceil(rand(100))) : (CtVar[s] = ceil(rand(200)-100));
@@ -95,24 +58,32 @@ slider20 == 1 ? (
 slider20 = 0;
 );
 
-beatpos = beatpos + ceil(step/100 * phase);
+beatpos = beatpos + ceil(step/100 * phase);     // Phase
 beatpos > step ? beatpos = beatpos - step;
 
+                                                // Hold mode
+                                                
+                                                
+
 rev == 0 ? slider13 = CtVar[step - beatpos + 1] / 100 * amount;    //rev on
+
+//rev == 1 ?                                                       //rev ping pong
+
 rev == 2 ? slider13 = CtVar[beatpos] / 100 * amount;               //rev off
 
-slider1 = val + slider12;
-slider1 < 0 ? slider1 = 0;
-slider1 > 100 ? slider1 = 100;
+slider51 = val + slider12;                       // Modulator
+slider_automate(slider51);
+slider51 < 0 ? slider1 = 0;
+slider51 > 100 ? slider1 = 100;
 
 @sample
 
-  mover = slider13;
+  mover = slider13;                             // Smooth
   out = out * coeff + mover * (1 - coeff);
 slider12 = out;
 
 
-@gfx 530 205
+@gfx 200 200
 
   gfx_set(0.18,0.18,0.18,1);
   gfx_rect(0,0,gfx_w,gfx_h);
@@ -134,6 +105,39 @@ slider12 = out;
   mouseHold = mouse_cap & 1;
        mouseClick = mouseHold && !(last_cap&1);
        lastCap = mouse_cap;
+       
+       
+  function rad(d)
+                ( d * $pi / 180 );
+                
+  function limitgui(s knob_min knob_max)
+              ( min(max(s, knob_min), knob_max) );
+                
+  function collision (_x _y _w _h)
+                      (
+                      mouse_x > _x && 
+                      mouse_x < _x + _w && 
+                      mouse_y > _y && 
+                      mouse_y < _y + _h
+                      );
+                      
+  function move(_x _y _w _h n) ( 
+         mouse_cap && collision (_x,_y,_w,_h) ? ( mouse_cap_old = 0) : ( mouse_cap_old = 1);
+         mouse_cap == 1 && mouse_cap_old == 0 && collision (_x,_y,_w,_h) ? (           //  mouse control
+    // knob_min = 2;
+    // knob_max = 64;
+          
+          drag == 0 ? (old_mouse_x = mouse_x; drag = 1; val_old = val);
+          drag == 1 ? (
+                       new_pos = slider(n) - (old_mouse_x - mouse_x)*0.5;
+                       old_mouse_x = mouse_x;
+                       slider(n) = limitgui(new_pos,2,64);
+                       slider_automate(slider(n));
+                      );
+                );
+                 mouse_cap == 0 ? drag = 0;
+  );
+  
   
 // ------------------------------------------step sliders
 
@@ -278,7 +282,7 @@ gfx_rect(_x,_y +_h/2,_w,(gfx_y - 10 -_h)/2);
   gfx_set(0.12,0.12,0.12,1);
   gfx_rect(5,177,254,23 );
       
-      (mouse_x >= 9 ) & (mouse_x < 520) &
+      (mouse_x >= 9 ) & (mouse_x < gfx_w-9) &
       (mouse_y >= 9) & (mouse_y < 141) ? (
         num_steps = ceil((mouse_x - 11) / (_w + sx));
        
@@ -583,11 +587,11 @@ _w = 60; _h = 56; _r = 13;
     gfx_rect(_x-_r-12,_y-_r,2*_r+24,2*_r+24,1);
 
           
-Round_knob(_x,_y,_r,1);
+Round_knob(_x,_y,_r,51);
 
                     mouseClick ? (         // Last touched parameter
             collision_R (_x,_y,_r) ? (
-             slider_automate(slider1);
+             slider_automate(slider51);
            );
         );
 
@@ -597,9 +601,8 @@ Round_knob(_x,_y,_r,1);
       gfx_x = 20; gfx_y = 181;
       gfx_setfont(1,"Arial bold",15);
       gfx_drawstr("MODULATOR");
-      
-      gfx_x = 120; gfx_y = 181;
-      gfx_setfont(1,"Arial bold",15);
-      gfx_drawstr("Click for Last Touch");
   );
+  
+  
+
 
