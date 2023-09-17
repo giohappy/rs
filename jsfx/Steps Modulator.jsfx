@@ -73,8 +73,8 @@ rev == 2 ? slider13 = CtVar[beatpos] / 100 * amount;               //rev off
 
 slider51 = val + slider12;                       // Modulator
 slider_automate(slider51);
-slider51 < 0 ? slider1 = 0;
-slider51 > 100 ? slider1 = 100;
+slider51 < 0 ? slider51 = 0;
+slider51 > 100 ? slider51 = 100;
 
 @sample
 
