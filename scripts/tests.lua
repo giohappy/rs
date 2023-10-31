@@ -27,15 +27,40 @@ function create_item()
   local ppos = reaper.GetCursorPosition()
   local item = reaper.CreateNewMIDIItemInProj(track, ppos, ppos + 2)
   local take =  reaper.GetMediaItemTake( item, 0 )
-  
+end
+
+function toBits(num,bits)
+    -- returns a table of bits, most significant first.
+    bits = bits or math.max(1, select(2, math.frexp(num)))
+    local t = {} -- will contain the bits        
+    for b = bits, 1, -1 do
+        t[b] = math.fmod(num, 2)
+        num = math.floor((num - t[b]) / 2)
+    end
+    return table.concat(t)
 end
 
 function item_state()
+  reaper.ClearConsole()
   local track = reaper.GetLastTouchedTrack()
   local item = reaper.GetTrackMediaItem(track, 0)
-  local ret, chunk = reaper.GetItemStateChunk(item, "")
-  reaper.ClearConsole()
-  reaper.ShowConsoleMsg(chunk)
+  --local ret, chunk = reaper.GetItemStateChunk(item, "")
+  local item_pos = reaper.GetMediaItemInfo_Value(item, "D_POSITION" )
+  local item_length = reaper.GetMediaItemInfo_Value(item, "D_LENGTH" )
+  local tk = reaper.GetActiveTake(item)
+  reaper.MIDI_Sort( tk )
+  local ret, buf = reaper.MIDI_GetAllEvts(tk)
+  local i = 0
+  local ppq_pos = 0
+  local pos = 1
+  while pos < #buf do
+    offset, flags, msg, pos = string.unpack("i4Bs4", buf, pos)
+    ppq_pos = ppq_pos + offset
+    local qn = reaper.MIDI_GetProjQNFromPPQPos(tk, ppq_pos)
+    
+    reaper.ShowConsoleMsg("EVT #"..i..": offset: "..offset.."("..qn.."), flags: "..tostring(flags)..", msg[1]: "..tostring(msg:byte(1))..", msg[2]: "..tostring(msg:byte(2))..", msg[3]: "..tostring(msg:byte(3)).."\n")
+    i = i +1
+  end
 end
 --copy_item()
 --create_item()
