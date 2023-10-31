@@ -57,8 +57,14 @@ function item_state()
     offset, flags, msg, pos = string.unpack("i4Bs4", buf, pos)
     ppq_pos = ppq_pos + offset
     local qn = reaper.MIDI_GetProjQNFromPPQPos(tk, ppq_pos)
-    
-    reaper.ShowConsoleMsg("EVT #"..i..": offset: "..offset.."("..qn.."), flags: "..tostring(flags)..", msg[1]: "..tostring(msg:byte(1))..", msg[2]: "..tostring(msg:byte(2))..", msg[3]: "..tostring(msg:byte(3)).."\n")
+    local evt_str = "EVT: "..string.format("%-4s",i)
+    local qn_str = "offset: "..string.format("%-7.3f", qn)
+    local flags_str = "flags: "..string.format("%-3s", tostring(flags))
+    local midi1_str = "msg[1]: "..string.format("%-5s", tostring(msg:byte(1)))
+    local midi2_str = "msg[2]: "..string.format("%-5s", tostring(msg:byte(2)))
+    local midi3_str = "msg[3]: "..string.format("%-5s", tostring(msg:byte(3)))
+    reaper.ShowConsoleMsg(evt_str..qn_str..flags_str..midi1_str..midi2_str..midi3_str.."\n")
+    --reaper.ShowConsoleMsg("EVT #"..i..": offset: "..offset.."("..qn.."), flags: "..tostring(flags)..", msg[1]: "..tostring(msg:byte(1))..", msg[2]: "..tostring(msg:byte(2))..", msg[3]: "..tostring(msg:byte(3)).."\n")
     i = i +1
   end
 end
